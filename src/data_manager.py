@@ -121,6 +121,11 @@ class DataLoader:
         self._train.to_csv(path + "_train.csv")
         self._test.to_csv(path + "_test.csv")
 
+    def load(self, train: pd.DataFrame, test: pd.DataFrame) -> None:
+        self._csv_path = None
+        self._train = train
+        self._test = test
+
 
 if __name__ == "__main__":
     import os
