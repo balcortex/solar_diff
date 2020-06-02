@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import os
 import random
 from typing import List, NamedTuple
 
 import pandas as pd
-import zipfile
+from zipfile import ZipFile, ZIP_DEFLATED
 
 
 class Dataset(NamedTuple):
@@ -127,8 +128,8 @@ class DataLoader:
         self._test = test
 
 
-if __name__ == "__main__":
-    import os
+def create_dataset(path: str) -> None:
+    print("Creating dataset . . .")
 
     AMARILLO_PATH = "/home/bal/Dropbox/Solar_Forecasting/texas_amarillo/amarillo_db.csv"
     AMARILLO_DIFF_PATH = (
@@ -156,8 +157,55 @@ if __name__ == "__main__":
         142,
     ]
 
-    amarillo.save_csv(os.path.join("data", "amarillo"))
-    amarillo_diff.save_csv(os.path.join("data", "amarillo_diff"))
-    amarillo_sky.save_csv(os.path.join("data", "amarillo_sky"))
+    amarillo.save_csv(os.path.join(path, "amarillo"))
+    amarillo_diff.save_csv(os.path.join(path, "amarillo_diff"))
+    amarillo_sky.save_csv(os.path.join(path, "amarillo_sky"))
 
-    print("Done")
+    print("Dataset created.")
+
+    print("Zipping . . .")
+    files = list_csv_files(path)
+    zip_files(os.path.join(path, "data.zip"), files)
+
+
+def zip_files(zip_path: str, file_paths: List[str]) -> None:
+    with ZipFile(zip_path, "w") as myzip:
+        for f in file_paths:
+            myzip.write(f, os.path.basename(f), compress_type=ZIP_DEFLATED)
+
+
+def list_csv_files(directory: str) -> List[str]:
+    return [
+        os.path.join(directory, file)
+        for file in os.listdir(directory)
+        if file.endswith("csv")
+    ]
+
+
+def delete_files(file_paths: List[str]) -> None:
+    for path in file_paths:
+        os.remove(path)
+
+
+def unzip_csv(zip_path: str, unzip_path: str) -> None:
+    ZipFile(zip_path).extractall(path=unzip_path)
+
+
+def update_database(path: str) -> None:
+    zip_dir = os.path.join(path, "data.zip")
+    zip_len = len(ZipFile(zip_dir).infolist())
+    dir_len = len(os.listdir(path))
+
+    # discount the zip file
+    if not zip_len == (dir_len - 1):
+        if dir_len > 1:
+            print("Deleting . . .")
+            delete_files(list_csv_files(path))
+        print("Unzipping . . .")
+        unzip_csv(zip_dir, path)
+    else:
+        print("Data is up to date")
+
+
+if __name__ == "__main__":
+    pass
