@@ -136,7 +136,8 @@ if __name__ == "__main__":
     )
 
     amarillo = DataLoader(AMARILLO_PATH)
-    amarillo_diff = DataLoader(AMARILLO_PATH)
+    amarillo_diff = DataLoader(AMARILLO_DIFF_PATH)
+    amarillo_sky = DataLoader("dummy_path")
     amarillo.read_csv()
     amarillo_diff.read_csv()
 
@@ -145,6 +146,10 @@ if __name__ == "__main__":
     amarillo.split_train_test(indices.train_drop, indices.test)
     amarillo_diff.split_train_test(indices.train_drop, indices.test)
 
+    train_sky = amarillo.get_dataset().train + amarillo_diff.get_dataset().train
+    test_sky = amarillo.get_dataset().test + amarillo_diff.get_dataset().test
+    amarillo_sky.load(train=train_sky, test=test_sky)
+
     assert list(amarillo.get_dataset().test.loc[9, "y36":"y38"].values) == [
         349,
         243,
@@ -152,6 +157,7 @@ if __name__ == "__main__":
     ]
 
     amarillo.save_csv(os.path.join("data", "amarillo"))
-    amarillo.save_csv(os.path.join("data", "amarillo_diff"))
+    amarillo_diff.save_csv(os.path.join("data", "amarillo_diff"))
+    amarillo_sky.save_csv(os.path.join("data", "amarillo_sky"))
 
     print("Done")
