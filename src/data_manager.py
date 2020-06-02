@@ -123,6 +123,8 @@ class DataLoader:
 
 
 if __name__ == "__main__":
+    import os
+
     AMARILLO_PATH = "/home/bal/Dropbox/Solar_Forecasting/texas_amarillo/amarillo_db.csv"
     AMARILLO_DIFF_PATH = (
         "/home/bal/Dropbox/Solar_Forecasting/texas_amarillo/amarillo_db_diff.csv"
@@ -144,6 +146,7 @@ if __name__ == "__main__":
         142,
     ]
 
-    # amarillo.save_csv("amarillo")
-    # amarillo_diff.save_csv("amarillo_diff")
+    amarillo.save_csv(os.path.join("data", "amarillo"))
+    amarillo.save_csv(os.path.join("data", "amarillo_diff"))
+
     print("Done")
