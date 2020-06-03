@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import os
 import random
-from typing import List, NamedTuple
+from typing import Dict, List, NamedTuple
+from zipfile import ZIP_DEFLATED, ZipFile
+import datetime
 
 import pandas as pd
-from zipfile import ZipFile, ZIP_DEFLATED
 
 
 class Dataset(NamedTuple):
@@ -205,6 +206,27 @@ def update_database(path: str) -> None:
         unzip_csv(zip_dir, path)
     else:
         print("Data is up to date")
+
+
+def get_dataset_filenames(dataset_path: str, dataset_name: str) -> Dict[str, str]:
+    "Return a dictionary mapping dataset keys to file names"
+    fnames = {}
+
+    files = [
+        os.path.join(dataset_path, file)
+        for file in os.listdir("data")
+        if (file.startswith(dataset_name) and file.endswith("csv"))
+    ]
+    for f in files:
+        key = f.split(dataset_name)[1:][0].strip(" _")
+        fnames[key] = f
+
+    return fnames
+
+
+def create_log_dir(path: str) -> None:
+    today = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+    os.makedirs(path + "-" + today, exist_ok=True)
 
 
 if __name__ == "__main__":
