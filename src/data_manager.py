@@ -3,10 +3,11 @@ from __future__ import annotations
 import os
 import random
 from typing import Dict, List, NamedTuple
-from zipfile import ZIP_DEFLATED, ZipFile
-import datetime
+from zipfile import ZipFile
 
 import pandas as pd
+
+from src.utils import list_files_extension, delete_files, zip_files, unzip_all
 
 
 class Dataset(NamedTuple):
@@ -165,31 +166,8 @@ def create_dataset(path: str) -> None:
     print("Dataset created.")
 
     print("Zipping . . .")
-    files = list_csv_files(path)
+    files = list_files_extension(path, extension="csv")
     zip_files(os.path.join(path, "data.zip"), files)
-
-
-def zip_files(zip_path: str, file_paths: List[str]) -> None:
-    with ZipFile(zip_path, "w") as myzip:
-        for f in file_paths:
-            myzip.write(f, os.path.basename(f), compress_type=ZIP_DEFLATED)
-
-
-def list_csv_files(directory: str) -> List[str]:
-    return [
-        os.path.join(directory, file)
-        for file in os.listdir(directory)
-        if file.endswith("csv")
-    ]
-
-
-def delete_files(file_paths: List[str]) -> None:
-    for path in file_paths:
-        os.remove(path)
-
-
-def unzip_csv(zip_path: str, unzip_path: str) -> None:
-    ZipFile(zip_path).extractall(path=unzip_path)
 
 
 def update_database(path: str) -> None:
@@ -201,9 +179,9 @@ def update_database(path: str) -> None:
     if not zip_len == (dir_len - 1):
         if dir_len > 1:
             print("Deleting . . .")
-            delete_files(list_csv_files(path))
+            delete_files(list_files_extension(path, extension="csv"))
         print("Unzipping . . .")
-        unzip_csv(zip_dir, path)
+        unzip_all(zip_dir, path)
     else:
         print("Data is up to date")
 
@@ -222,11 +200,6 @@ def get_dataset_filenames(dataset_path: str, dataset_name: str) -> Dict[str, str
         fnames[key] = f
 
     return fnames
-
-
-def create_log_dir(path: str) -> None:
-    today = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-    os.makedirs(path + "-" + today, exist_ok=True)
 
 
 if __name__ == "__main__":
