@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 import random
-from typing import Dict, List, NamedTuple
+from typing import Dict, List, NamedTuple, Optional
 from zipfile import ZipFile
+import tensorflow as tf
 
 import pandas as pd
 
@@ -197,9 +198,32 @@ def get_dataset_filenames(dataset_path: str, dataset_name: str) -> Dict[str, str
     ]
     for f in files:
         key = f.split(dataset_name)[1:][0].strip(" _")
+        key = key.split(".")[0]
         fnames[key] = f
 
     return fnames
+
+
+def dataframe_to_dataset(
+    df: pd.DataFrame,
+    input_size: int,
+    output_size: int,
+    batch_size: int = 32,
+    buffer_size: int = 1000,
+    seed: Optional[int] = None,
+) -> tf.data.Dataset:
+    "Create tf-dataset from pandas-dataframe"
+    dataset = tf.data.Dataset.from_tensor_slices(df.to_numpy())
+    dataset = dataset.shuffle(buffer_size=buffer_size, seed=seed)
+    dataset = dataset.map(
+        lambda window: (
+            window[:input_size],
+            window[input_size : input_size + output_size],
+        )
+    )
+    dataset = dataset.batch(batch_size=batch_size, drop_remainder=False).prefetch(3)
+
+    return dataset
 
 
 if __name__ == "__main__":
