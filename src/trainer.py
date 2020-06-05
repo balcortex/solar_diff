@@ -34,7 +34,7 @@ class Trainer:
         Parameters:
             dataset(str): name of the dataset. One of the following:
                 - amarillo
-            keras_model: keras compiled model.
+            keras_model: keras uncompiled model.
             log_dir: path of the path to output results in.
             num_outputs: steps of the forecasting task (e.g. 1 = one-step ahead)
             data_dir: path containing the datasets
@@ -57,6 +57,8 @@ class Trainer:
 
         self._load_csv()
         self._cols_names = self._split_cols_name(num_outputs=num_outputs)
+        self.input_size = len(self._cols_names.inputs)
+        self.output_size = len(self._cols_names.outputs)
         self._create_datasets()
         self._prepare_directories()
 
@@ -71,6 +73,7 @@ class Trainer:
         for name, path in self._filenames.items():
             logging.info(f"Reading {path}")
             self._dataframes[name] = pd.read_csv(path)
+            self._dataframes[name].drop(columns=["Unnamed: 0"], inplace=True)
 
     def _prepare_directories(self) -> None:
         "Create the necessary directories for logging results"
