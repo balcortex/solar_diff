@@ -3,7 +3,7 @@ from tensorflow.keras import Sequential
 from typing import Sequence, Optional
 
 
-def get_model(
+def get_MLP(
     input_size: int,
     output_size: int,
     hidden: Sequence[int],

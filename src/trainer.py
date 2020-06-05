@@ -11,6 +11,7 @@ from src.data_manager import (
     update_database,
     dataframe_to_dataset,
 )
+from src.network import get_MLP
 from src.utils import create_log_dir
 
 DATASET_NAMES = ["amarillo"]
@@ -23,18 +24,12 @@ class SplitedCols(NamedTuple):
 
 class Trainer:
     def __init__(
-        self,
-        dataset_name: str,
-        keras_model: keras.Model,
-        log_dir: str,
-        num_outputs: int,
-        data_dir: str = "data",
+        self, dataset_name: str, log_dir: str, num_outputs: int, data_dir: str = "data",
     ) -> None:
         """
         Parameters:
             dataset(str): name of the dataset. One of the following:
                 - amarillo
-            keras_model: keras uncompiled model.
             log_dir: path of the path to output results in.
             num_outputs: steps of the forecasting task (e.g. 1 = one-step ahead)
             data_dir: path containing the datasets
@@ -44,7 +39,6 @@ class Trainer:
         update_database(path=data_dir)
 
         self._dataset_name = dataset_name
-        self._model = keras_model
         self._log_dir = log_dir
         self._num_outputs = num_outputs
         self._data_dir = data_dir
@@ -54,6 +48,7 @@ class Trainer:
 
         self._dataframes = {}
         self._datasets = {}
+        self._model = get_MLP(self.input_size, self.output_size, hidden=(100, 100, 100))
 
         self._load_csv()
         self._cols_names = self._split_cols_name(num_outputs=num_outputs)
@@ -62,8 +57,11 @@ class Trainer:
         self._create_datasets()
         self._prepare_directories()
 
-    def train(self):
-        pass
+    def fit(self, **kwargs):
+        # for key, value in self._datasets.values():
+        print("Training . . .")
+        self._model.fit(self._datasets["test"], **kwargs)
+        print("Trained end.")
 
     def test(self):
         pass
