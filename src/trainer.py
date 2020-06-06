@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 from typing import Dict, NamedTuple, List, Optional
 from tensorflow import keras
@@ -48,7 +49,7 @@ class Trainer:
 
         self._dataframes = {}
         self._datasets = {}
-        self._model = get_MLP(self.input_size, self.output_size, hidden=(100, 100, 100))
+        self.preds = {}
 
         self._load_csv()
         self._cols_names = self._split_cols_name(num_outputs=num_outputs)
@@ -57,14 +58,42 @@ class Trainer:
         self._create_datasets()
         self._prepare_directories()
 
-    def fit(self, **kwargs):
-        # for key, value in self._datasets.values():
-        print("Training . . .")
-        self._model.fit(self._datasets["test"], **kwargs)
-        print("Trained end.")
+        self._models = self.get_models()
 
-    def test(self):
-        pass
+    def get_models(self) -> Dict[str, keras.Model]:
+        raise NotImplementedError
+
+    def fit(self, **kwargs):
+        for model_name, model in self._models.items():
+            print(f"Training model {model_name} . . .")
+            for dataset_name, dataset in self._datasets.items():
+                if (model_name == dataset_name.split("_")[0]) and (
+                    dataset_name.split("_")[1] == "train"
+                ):
+                    print(
+                        f"Fitting {model_name} model with {dataset_name} dataset . . ."
+                    )
+                    model.fit(dataset, **kwargs)
+        print("Training done.")
+
+    def test(self) -> Dict[str, np.ndarray]:
+        for model_name, model in self._models.items():
+            print(f"Testing model {model_name} . . .")
+            for dataset_name, dataset in self._datasets.items():
+                if (model_name == dataset_name.split("_")[0]) and (
+                    dataset_name.split("_")[1] == "test"
+                ):
+                    print(
+                        f"Testing {model_name} model with {dataset_name} dataset . . ."
+                    )
+                    self.preds[model_name] = model.predict(dataset)
+                    # print(f"{preds=}")
+        print("Testing done.")
+
+        return self.preds
+
+    def get_targets(self) -> np.ndarray:
+        return self._dataframes["norm_test"][self._cols_names.outputs].values
 
     def _load_csv(self) -> None:
         "Load the csv files associated with the chosen database"
@@ -92,8 +121,42 @@ class Trainer:
     def _create_datasets(self) -> None:
         "Create tf-datasets for training the model"
         for name in self._filenames.keys():
-            self._datasets[name] = dataframe_to_dataset(
-                df=self._dataframes[name],
-                input_size=len(self._cols_names.inputs),
-                output_size=len(self._cols_names.outputs),
-            )
+            # sky do not need to be a dataset
+            if name.find("sky") == -1:
+                self._datasets[name] = dataframe_to_dataset(
+                    df=self._dataframes[name],
+                    input_size=len(self._cols_names.inputs),
+                    output_size=len(self._cols_names.outputs),
+                )
+
+
+class TrainerMLP(Trainer):
+    # def __init__(
+    #     self, dataset_name: str, log_dir: str, num_outputs: int, data_dir: str = "data",
+    # ) -> None:
+    #     """
+    #     Parameters:
+    #         dataset(str): name of the dataset. One of the following:
+    #             - amarillo
+    #         log_dir: path of the path to output results in.
+    #         num_outputs: steps of the forecasting task (e.g. 1 = one-step ahead)
+    #         data_dir: path containing the datasets
+    #     """
+    #     super(TrainerMLP, self).__init__(dataset_name, log_dir, num_outputs, data_dir)
+
+    def get_models(self) -> Dict[str, keras.Model]:
+        model_norm = get_MLP(self.input_size, self.output_size, hidden=(100, 100, 100))
+        model_diff = get_MLP(self.input_size, self.output_size, hidden=(100, 100, 100))
+        model_norm.compile(
+            optimizer=keras.optimizers.Adam(lr=1e-3),
+            loss=keras.losses.mse,
+            metrics=[keras.metrics.mse],
+        )
+        model_diff.compile(
+            optimizer=keras.optimizers.Adam(lr=1e-3),
+            loss=keras.losses.mse,
+            metrics=[keras.metrics.mse],
+        )
+
+        # return {"diff": model_diff, "norm": model_norm}
+        return {"norm": model_norm}
