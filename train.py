@@ -81,19 +81,7 @@ def scale_dataframe(
         assert df[col].max() == new_max
 
 
-def scale(df: pd.DataFrame, cols=None, new_max=1, new_min=-1):
-    cols = cols or df.columns
-    for col in cols:
-        col_max = df[col].max()
-        col_min = df[col].min()
-        df[col] = new_min + ((df[col] - col_min) * (new_max - new_min)) / (
-            col_max - col_min
-        )
-
-    return df
-
-
-def read_csv(path: str, scale: bool = False) -> pd.DataFrame:
+def read_csv(path: str, scale: bool = False, **kwargs) -> pd.DataFrame:
     drop_cols = [f"y{i}" for i in range(NUM_OUTPUTS, 48)]  # drop unnecessary outputs
     drop_cols.append("Unnamed: 0")
     df = pd.read_csv(path)
@@ -102,7 +90,7 @@ def read_csv(path: str, scale: bool = False) -> pd.DataFrame:
     if scale:
         print(f"Scaling {path} . . .")
         input_cols = [f"x{i}" for i in range(96)]
-        scale_dataframe(df, input_cols)
+        scale_dataframe(df, input_cols, **kwargs)
 
     return df
 

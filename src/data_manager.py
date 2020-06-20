@@ -154,12 +154,6 @@ def create_dataset(path: str) -> None:
     test_sky = amarillo.get_dataset().test + amarillo_diff.get_dataset().test
     amarillo_sky.load(train=train_sky, test=test_sky)
 
-    # assert list(amarillo.get_dataset().test.loc[9, "y36":"y38"].values) == [
-    #     349,
-    #     243,
-    #     142,
-    # ]
-
     amarillo.save_csv(os.path.join(path, "amarillo_norm"))
     amarillo_diff.save_csv(os.path.join(path, "amarillo_diff"))
     amarillo_sky.save_csv(os.path.join(path, "amarillo_sky"))

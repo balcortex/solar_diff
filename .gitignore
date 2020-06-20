@@ -2,6 +2,7 @@ _temp_database_manager.py
 _temp_trainer.py
 _temp_models.py
 *.csv
+figs*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
