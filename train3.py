@@ -16,13 +16,14 @@ NUM_INPUTS = 96
 NUM_OUTPUTS = 1
 VAL_SPLIT = 0.1  # Percentage
 BATCH_SIZE = 64
-EPOCHS = 1000
-EXPERIMENTS_NUM = 30
-PATIENCE = 10  # Early stoping
+EPOCHS = 10000
+EXPERIMENTS_NUM = 100
+PATIENCE = 30  # Early stoping
 LEARNING_RATE = 1e-3
 BATCH_NORM_LAYER = False
-CLIP_PREDS = True
+CLIP_PREDS = False
 CLIP_INPUTS = False
+SAVE_FIGS = False
 
 
 class Loss(NamedTuple):
@@ -135,37 +136,27 @@ def experiment(
     batch_norm_layer: bool = False,
     clip_preds: bool = False,
     clip_inputs: bool = False,
-):
+) -> ForecastResult:
+    """
+    Params:
+        data_model:
+            norm: forecasting with direct measurements
+            diff: forecasting with differences (clear_sky - measurements)
+        scale: wether to scale input columns
+        seed: reproducibility
+        save_figs: wether to save plots
+        batch_norm_layer: use batch normalization layer on the model
+        clips_preds: clip negative predictions to zero
+        clip_inputs: clip negative input differences to zero
+    """
+
     if seed:
         np.random.seed(seed)
 
     print(f"Running model: {data_model}, scale: {scale}")
-    path_fig = create_log_dir(os.path.join("figs", data_model), dated=True)
     path = "data{sep}amarillo_{{model}}_{{dataset}}.csv".format(sep=os.path.sep)
-
-    # mix input differences with real output
-    if data_model == "diffmix":
-        df_train_norm = read_csv(
-            path.format(model="norm", dataset="train"), scale=scale
-        )
-        df_test_norm = read_csv(path.format(model="norm", dataset="test"), scale=scale)
-        df_train_diff = read_csv(
-            path.format(model="diff", dataset="train"), scale=scale
-        )
-        df_test_diff = read_csv(path.format(model="diff", dataset="test"), scale=scale)
-        cols = df_train_norm.columns
-        x_inputs = [col for col in cols if "x" in col]
-        df_train = df_train_diff[x_inputs].copy()
-        df_train["y0"] = df_train_norm["y0"].values
-        df_test = df_test_diff[x_inputs].copy()
-        df_test["y0"] = df_test_norm["y0"].values
-        np.array_equal(df_train[x_inputs].values, df_train_diff[x_inputs].values)
-        np.array_equal(df_test[x_inputs].values, df_test_diff[x_inputs].values)
-        np.array_equal(df_train["y0"].values, df_train_norm["y0"].values)
-        np.array_equal(df_test["y0"].values, df_test_norm["y0"].values)
-    else:
-        df_train = read_csv(path.format(model=data_model, dataset="train"), scale=scale)
-        df_test = read_csv(path.format(model=data_model, dataset="test"), scale=scale)
+    df_train = read_csv(path.format(model=data_model, dataset="train"), scale=scale)
+    df_test = read_csv(path.format(model=data_model, dataset="test"), scale=scale)
 
     if clip_inputs and not scale:
         print("Clipping inputs . . .")
@@ -202,7 +193,7 @@ def experiment(
         ],
     )
 
-    if data_model != "diff":
+    if data_model == "norm":
         targets = df_test["y0"].values
         preds = model.predict(ds_test).T[0]
     # Calculate predictions on original dataset
@@ -224,13 +215,14 @@ def experiment(
     print(losses)
 
     if save_figs:
+        path_fig = create_log_dir(os.path.join("figs", data_model), dated=True)
+
         for index, (target, pred) in enumerate(
             zip(targets.reshape(1, 10, 144)[0], preds.reshape(1, 10, 144)[0],)
         ):
             plt.clf()
             plt.plot(target[:48], "b", label="Targets")
             plt.plot(pred[:48], "r", label="Forecast")
-            # plt.ylim(-100, 1100)
             plt.legend()
             plt.title(f"Irradiance level {index+1}")
             temp_path = os.path.join(path_fig, f"fig_level_{index+1}")
@@ -247,37 +239,25 @@ exps = {
     "norm_unscaled_exp": {
         "config": {"data_model": "norm", "scale": False,},
         "results": {},
+        "levels": {},
     },
     "diff_unscaled_exp": {
         "config": {"data_model": "diff", "scale": False,},
         "results": {},
+        "levels": {},
     },
-    # "norm_scaled_exp": {
-    #     "config": {"data_model": "norm", "scale": True,},
-    #     "results": {},
-    # },
-    # "diff_scaled_exp": {
-    #     "config": {"data_model": "diff", "scale": True,},
-    #     "results": {},
-    # },
-    # "diffmix_unscaled_exp": {
-    #     "config": {"data_model": "diffmix", "scale": False,},
-    #     "results": {},
-    # },
-    # "diffmix_scaled_exp": {
-    #     "config": {"data_model": "diffmix", "scale": True,},
-    #     "results": {},
-    # },
 }
 
 for exp_name, exp_dict in exps.items():
-    mean_mse = 0
-    mean_mae = 0
-    mean_smape = 0
+    total_mse = 0
+    total_mae = 0
+    total_smape = 0
     min_mse = np.inf
     max_mse = -np.inf
-    exp_min = 0
-    exp_max = 0
+    min_mae = np.inf
+    max_mae = -np.inf
+    min_smape = np.inf
+    max_smape = -np.inf
 
     # Run experiments
     for i in range(EXPERIMENTS_NUM):
@@ -287,36 +267,39 @@ for exp_name, exp_dict in exps.items():
             mdl,
             scale=scl,
             seed=None,
-            save_figs=True,
+            save_figs=SAVE_FIGS,
             batch_norm_layer=BATCH_NORM_LAYER,
             clip_preds=CLIP_PREDS,
             clip_inputs=CLIP_INPUTS,
         )
         exps[exp_name]["results"][str(i)] = current_exp
 
-        mean_mse += current_exp.loss.mse
-        mean_mae += current_exp.loss.mae
-        mean_smape += current_exp.loss.smape
+        total_mse += current_exp.loss.mse
+        total_mae += current_exp.loss.mae
+        total_smape += current_exp.loss.smape
 
-        if current_exp.loss.mse < min_mse:
-            min_mse = current_exp.loss.mse
-            exp_min = i
-
-        if current_exp.loss.mse > max_mse:
-            max_mse = current_exp.loss.mse
-            exp_max = i
+        min_mse = min(min_mse, current_exp.loss.mse)
+        max_mse = max(max_mse, current_exp.loss.mse)
+        min_mae = min(min_mae, current_exp.loss.mae)
+        max_mae = max(max_mae, current_exp.loss.mae)
+        min_smape = min(min_smape, current_exp.loss.smape)
+        max_smape = max(max_smape, current_exp.loss.smape)
 
     # Compute mean errors across experiments
     exps[exp_name]["metrics"] = {
-        "mse": mean_mse / EXPERIMENTS_NUM,
-        "mae": mean_mae / EXPERIMENTS_NUM,
-        "smape": mean_smape / EXPERIMENTS_NUM,
+        "total_mean_mse": total_mse / EXPERIMENTS_NUM,
+        "total_mean_mae": total_mae / EXPERIMENTS_NUM,
+        "total_mean_smape": total_smape / EXPERIMENTS_NUM,
         "min_mse": min_mse,
         "max_mse": max_mse,
-        "exp_min": exp_min,
-        "exp_max": exp_max,
+        "min_mae": min_mae,
+        "max_mae": max_mae,
+        "min_smape": min_smape,
+        "max_smape": max_smape,
     }
 
+
+PLOT_MEAN_PREDS = False
 
 # Mean preds
 for exp_name in exps.keys():
@@ -330,19 +313,32 @@ for exp_name in exps.keys():
     for index, (target, pred) in enumerate(
         zip(targets.reshape(1, 10, 144)[0], mean_preds.reshape(1, 10, 144)[0],)
     ):
-        plt.clf()
-        plt.plot(target[:48], "b", label="Targets")
-        plt.plot(pred[:48], "r", label="Forecast")
-        plt.legend()
-        plt.title(f"Irradiance level {index+1}")
-        dir_path = os.path.join("figs", "means", exp_name)
-        os.makedirs(dir_path, exist_ok=True)
-        temp_path = os.path.join(dir_path, f"fig_level_{index+1}")
-        plt.savefig(temp_path)
-        logging.debug(f"Fig saved to {temp_path}")
+        if PLOT_MEAN_PREDS:
+            plt.clf()
+            plt.plot(target[:48], "b", label="Targets")
+            plt.plot(pred[:48], "r", label="Forecast")
+            plt.legend()
+            plt.title(f"Irradiance level {index+1}")
+            dir_path = os.path.join("figs", "means", exp_name)
+            os.makedirs(dir_path, exist_ok=True)
+            temp_path = os.path.join(dir_path, f"fig_level_{index+1}")
+            plt.savefig(temp_path)
+            logging.debug(f"Fig saved to {temp_path}")
+            plt.close()
 
-    plt.close()
+        level = f"level{index}"
+        exps[exp_name]["levels"][level] = {}
+        exps[exp_name]["levels"][level]["mse"] = mse(target[:48], pred[:48])
+        exps[exp_name]["levels"][level]["mae"] = mae(target[:48], pred[:48])
+        exps[exp_name]["levels"][level]["smape"] = smape(target[:48], pred[:48])
 
 
 for exp_name, exp_dict in exps.items():
     print(f'{exp_name}: {exp_dict["metrics"]}')
+
+df = pd.DataFrame()
+for exp_name in exps.keys():
+    df[exp_name] = exps[exp_name]["results"]["mean_pred"]
+df["targets"] = exps["norm_unscaled_exp"]["results"]["0"].targets
+df.to_csv("preds.csv")
+
